@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Library Book Management — Demo</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+    input, button { padding: .5rem; margin: .25rem 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { border: 1px solid #ddd; padding: .5rem; text-align: left; }
+    th { background: #f3f3f3; }
+  </style>
+</head>
+<body>
+  <h1>Library Book Management — Demo</h1>
+
+  <section>
+    <h2>Add a book</h2>
+    <form id="addForm">
+      <input id="title" placeholder="Title" required />
+      <input id="author" placeholder="Author" />
+      <input id="year" placeholder="Year" type="number" />
+      <button type="submit">Add</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Books</h2>
+    <table id="booksTable">
+      <thead><tr><th>ID</th><th>Title</th><th>Author</th><th>Year</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <script>
+    const apiBase = 'http://localhost:3000/api/books';
+
+    async function fetchBooks() {
+      const res = await fetch(apiBase);
+      const books = await res.json();
+      const tbody = document.querySelector('#booksTable tbody');
+      tbody.innerHTML = '';
+      books.forEach(b => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${b.id}</td>
+          <td><input data-id="${b.id}" class="edit-title" value="${escapeHtml(b.title)}"/></td>
+          <td><input data-id="${b.id}" class="edit-author" value="${escapeHtml(b.author||'')}"/></td>
+          <td><input data-id="${b.id}" class="edit-year" value="${b.year||''}" type="number"/></td>
+          <td>
+            <select data-id="${b.id}" class="edit-status">
+              <option value="available" ${b.status==='available'?'selected':''}>available</option>
+              <option value="checked-out" ${b.status==='checked-out'?'selected':''}>checked-out</option>
+            </select>
+          </td>
+          <td>
+            <button class="save" data-id="${b.id}">Save</button>
+            <button class="delete" data-id="${b.id}">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // attach handlers
+      document.querySelectorAll('.save').forEach(btn => {
+        btn.onclick = async (e) => {
+          const id = e.target.dataset.id;
+          const title = document.querySelector(`.edit-title[data-id="${id}"]`).value;
+          const author = document.querySelector(`.edit-author[data-id="${id}"]`).value;
+          const year = document.querySelector(`.edit-year[data-id="${id}"]`).value || null;
+          const status = document.querySelector(`.edit-status[data-id="${id}"]`).value;
+          await fetch(`${apiBase}/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, author, year, status })
+          });
+          fetchBooks();
+        };
+      });
+
+      document.querySelectorAll('.delete').forEach(btn => {
+        btn.onclick = async (e) => {
+          const id = e.target.dataset.id;
+          if (!confirm('Delete this book?')) return;
+          await fetch(`${apiBase}/${id}`, { method: 'DELETE' });
+          fetchBooks();
+        };
+      });
+    }
+
+    document.getElementById('addForm').addEventListener('submit', async (evt) => {
+      evt.preventDefault();
+      const title = document.getElementById('title').value.trim();
+      const author = document.getElementById('author').value.trim();
+      const year = document.getElementById('year').value || null;
+      if (!title) return alert('Title required');
+      await fetch(apiBase, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, author, year })
+      });
+      document.getElementById('addForm').reset();
+      fetchBooks();
+    });
+
+    function escapeHtml(s) {
+      return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    // initial
+    fetchBooks();
+  </script>
+</body>
+</html>
